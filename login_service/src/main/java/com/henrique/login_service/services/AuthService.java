@@ -19,15 +19,11 @@ public class AuthService {
         this.passwordEncoder = passwordEncoder;
     }
 
-    public Optional<Usuario> authenticate(String nome, String senha) {
-        Optional<Usuario> usuarioOpt =  usuarioRepository.findByNome(nome);
-        if(usuarioOpt.isPresent()) {
-            Usuario usuario = usuarioOpt.get();
-            if(passwordEncoder.matches(senha, usuario.getSenhaHash())) {
-                return Optional.of(usuario);
-            }
-        }
+    public Optional<Usuario> findByNome(String nome) {
+        return usuarioRepository.findByNome(nome);
+    }
 
-        return Optional.empty();
+    public boolean isPasswordValid(Usuario usuario, String senha) {
+        return passwordEncoder.matches(senha, usuario.getSenhaHash());
     }
 }
