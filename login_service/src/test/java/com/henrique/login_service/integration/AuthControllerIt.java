@@ -1,74 +1,70 @@
 package com.henrique.login_service.integration;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-
 import org.springframework.boot.test.web.client.TestRestTemplate;
-import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.http.*;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.jdbc.Sql;
+import org.springframework.test.context.jdbc.Sql.ExecutionPhase;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.henrique.login_service.config.TestSecurityConfig;
 import com.henrique.login_service.controllers.dtos.LoginDTO;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-public class AuthControllerIt {
-
-    @LocalServerPort
-    private int port;
+@Import(TestSecurityConfig.class)
+@Sql(scripts = "/data.sql", executionPhase = ExecutionPhase.BEFORE_TEST_METHOD)
+@Sql(scripts = "/remove_usuario.sql", executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
+@ActiveProfiles("it")
+public class AuthControllerIT {
 
     @Autowired
     private TestRestTemplate restTemplate;
 
-    @Autowired
-    private ObjectMapper objectMapper;
+    private ResponseEntity<Map> postLogin(LoginDTO loginDTO) {
+        return restTemplate.postForEntity("/auth/login", new HttpEntity<>(loginDTO), Map.class);
+    }
 
     @Test
-    void deveRetornarTokenQuandoCredenciaisForemValidas() throws Exception {
-        // Criar payload válido
+    void login_ComCredenciaisValidas_DeveRetornarToken() {
         LoginDTO loginDTO = new LoginDTO("joao", "123");
 
-        String url = "http://localhost:" + port + "/auth/login";
+        ResponseEntity<Map> response = postLogin(loginDTO);
 
-        // Executar requisição POST
-        ResponseEntity<Map> response = restTemplate.postForEntity(url, loginDTO, Map.class);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertTrue(response.getBody().containsKey("token"));
-        assertEquals(200, response.getBody().get("status"));
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).containsKey("token");
+        assertThat(response.getBody()).containsEntry("status", 200);
     }
 
     @Test
     void deveRetornar404QuandoUsuarioNaoExiste() {
         LoginDTO loginDTO = new LoginDTO("usuarioInexistente", "senhaQualquer");
 
-        String url = "http://localhost:" + port + "/auth/login";
+        ResponseEntity<Map> response = postLogin(loginDTO);
 
-        ResponseEntity<Map> response = restTemplate.postForEntity(url, loginDTO, Map.class);
-
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertEquals("Usuário não encontrado", response.getBody().get("error"));
-        assertEquals(404, response.getBody().get("status"));
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody()).containsEntry("error", "Usuário não encontrado");
+        assertThat(response.getBody()).containsEntry("status", 404);
     }
 
     @Test
     void deveRetornar401QuandoSenhaForInvalida() {
         LoginDTO loginDTO = new LoginDTO("joao", "senhaErrada");
 
-        String url = "http://localhost:" + port + "/auth/login";
+        ResponseEntity<Map> response = postLogin(loginDTO);
 
-        ResponseEntity<Map> response = restTemplate.postForEntity(url, loginDTO, Map.class);
-
-        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertEquals("Senha incorreta", response.getBody().get("error"));
-        assertEquals(401, response.getBody().get("status"));
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody()).containsEntry("error", "Senha incorreta");
+        assertThat(response.getBody()).containsEntry("status", 401);
     }
 }
