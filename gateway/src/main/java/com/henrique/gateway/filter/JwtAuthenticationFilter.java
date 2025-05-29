@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpCookie;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -43,16 +44,25 @@ public class JwtAuthenticationFilter implements GlobalFilter {
             return chain.filter(exchange);
         }
 
-        String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+        String token = null;
 
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            jwtLogger.logMissingHeader();
+        String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7);
+            jwtLogger.logTokenExtracted(token);
+        } else {
+            HttpCookie cookie = exchange.getRequest().getCookies().getFirst("jwt");
+            if (cookie != null) {
+                token = cookie.getValue();
+                jwtLogger.logTokenExtracted(token);
+            }
+        }
+
+        if (token == null) {
+            jwtLogger.logMissingToken();
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();
         }
-
-        String token = authHeader.substring(7);
-        jwtLogger.logTokenExtracted(token);
 
         try {
             SecretKey key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
@@ -78,10 +88,9 @@ public class JwtAuthenticationFilter implements GlobalFilter {
             return chain.filter(modifiedExchange);
 
         } catch (JwtException e) {
-            jwtLogger.logInvalidToken(e.getMessage()); 
+            jwtLogger.logInvalidToken(e.getMessage());
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();
         }
     }
-    
 }
