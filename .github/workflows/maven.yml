@@ -19,6 +19,7 @@ jobs:
         uses: actions/setup-java@v3
         with:
           java-version: 17
+          distribution: temurin
 
       - name: Run Unit Tests
         working-directory: ./login_service
@@ -35,6 +36,7 @@ jobs:
         uses: actions/setup-java@v3
         with:
           java-version: 17
+          distribution: temurin
 
       - name: Run Integration Tests
         working-directory: ./login_service
