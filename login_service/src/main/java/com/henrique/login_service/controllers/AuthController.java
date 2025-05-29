@@ -2,6 +2,7 @@ package com.henrique.login_service.controllers;
 
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -38,30 +39,27 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<Map<String, Object>> login(@RequestBody LoginDTO creds) {
+    public ResponseEntity<Map<String, Object>> login(@RequestBody LoginDTO creds, HttpServletResponse response) {
         String nome = creds.nome();
         String senha = creds.senha();
 
         Optional<Usuario> usuarioOpt = authService.findByNome(nome);
         if (usuarioOpt.isEmpty()) {
-            Map<String, Object> body = Map.of(
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
                 "error", "Usuário não encontrado",
                 "status", HttpStatus.NOT_FOUND.value()
-            );
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+            ));
         }
 
         Usuario usuario = usuarioOpt.get();
         if (!authService.isPasswordValid(usuario, senha)) {
-            Map<String, Object> body = Map.of(
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
                 "error", "Senha incorreta",
                 "status", HttpStatus.UNAUTHORIZED.value()
-            );
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(body);
+            ));
         }
 
         SecretKey key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
-
         String token = Jwts.builder()
                 .setSubject(nome)
                 .claim("role", "user")
@@ -71,12 +69,19 @@ public class AuthController {
                 .signWith(key)
                 .compact();
 
-        Map<String, Object> tokenMap = Map.of(
-            "token", token,
-            "status", HttpStatus.OK.value()
-        );
+        String cookieValue = "jwt=" + token + "; Path=/; HttpOnly; SameSite=Lax; Max-Age=3600";
+        response.setHeader("Set-Cookie", cookieValue);
 
-        return ResponseEntity.ok(tokenMap);
+        /*
+        // Ambiente de produção
+        String cookieValue = "jwt=" + token + "; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=3600";
+        response.setHeader("Set-Cookie", cookieValue);
+        */
+
+        return ResponseEntity.ok(Map.of(
+            "message", "Login realizado com sucesso"
+        ));
     }
 
 }
+
