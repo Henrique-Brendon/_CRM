@@ -1,5 +1,12 @@
 package com.henrique.login_service.controllers;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.parameters.RequestBody;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import jakarta.servlet.http.HttpServletResponse;
@@ -8,7 +15,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -27,6 +33,7 @@ import javax.crypto.SecretKey;
 
 @RestController
 @RequestMapping("/auth")
+@Tag(name = "Autenticação", description = "Operações de autenticação de usuários")
 public class AuthController {
 
     private final AuthService authService;
@@ -37,6 +44,20 @@ public class AuthController {
     public AuthController(AuthService authService) {
         this.authService = authService;
     }
+
+    @Operation(
+        summary = "Login do usuário",
+        description = "Autentica o usuário e retorna um cockie JWT para sessões autenticadas",
+        requestBody = @RequestBody(
+            required = true,
+            content = @Content(schema = @Schema(implementation = LoginDTO.class))
+        ),
+        responses = {
+            @ApiResponse(responseCode = "200", description = "Login realizado com sucesso"),
+            @ApiResponse(responseCode = "401", description = "Senha incorreta"),
+            @ApiResponse(responseCode = "404", description = "Usuário não encontrado")
+        }
+    )
 
     @PostMapping("/login")
     public ResponseEntity<Map<String, Object>> login(@RequestBody LoginDTO creds, HttpServletResponse response) {
