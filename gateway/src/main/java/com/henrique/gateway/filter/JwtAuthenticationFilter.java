@@ -11,6 +11,9 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
+
+import com.henrique.gateway.util.JwtLogger;
+
 import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
@@ -24,23 +27,32 @@ public class JwtAuthenticationFilter implements GlobalFilter {
     @Value("${jwt.secret}")
     private String secret;
 
+    private final JwtLogger jwtLogger;
+
+    public JwtAuthenticationFilter(JwtLogger jwtLogger) {
+        this.jwtLogger = jwtLogger;
+    }
+
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         String path = exchange.getRequest().getURI().getPath();
+        jwtLogger.logPath(path);
 
         if (path.startsWith("/auth")) {
+            jwtLogger.logBypass(path);
             return chain.filter(exchange);
         }
 
         String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
 
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            System.out.println("[JwtFilter] Header Authorization inválido ou ausente");
+            jwtLogger.logMissingHeader();
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();
         }
 
         String token = authHeader.substring(7);
+        jwtLogger.logTokenExtracted(token);
 
         try {
             SecretKey key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
@@ -53,6 +65,8 @@ public class JwtAuthenticationFilter implements GlobalFilter {
             String username = claims.getSubject();
             String role = claims.get("role", String.class);
 
+            jwtLogger.logTokenValid(username, role);
+
             ServerWebExchange modifiedExchange = exchange.mutate()
                     .request(builder -> builder
                             .headers(httpHeaders -> {
@@ -64,8 +78,10 @@ public class JwtAuthenticationFilter implements GlobalFilter {
             return chain.filter(modifiedExchange);
 
         } catch (JwtException e) {
+            jwtLogger.logInvalidToken(e.getMessage()); 
             exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
             return exchange.getResponse().setComplete();
         }
     }
+    
 }
