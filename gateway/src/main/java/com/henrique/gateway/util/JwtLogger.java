@@ -35,7 +35,8 @@ public class JwtLogger {
 
     public void logTokenExtracted(String token) {
         if (properties.isDebugEnabled()) {
-            logger.debug("[JwtFilter] Token JWT extraído (parcial): {}...", token.substring(0, Math.min(10, token.length())));
+            String partial = token.length() > 10 ? token.substring(0, 10) + "..." : token;
+            logger.debug("[JwtFilter] Token JWT extraído (parcial): {}", partial);
         }
     }
 
@@ -49,5 +50,9 @@ public class JwtLogger {
 
     public void logInvalidToken(String message) {
         logger.warn("[JwtFilter] Token inválido: {}", message);
+    }
+
+    public void logMissingToken() {
+        logger.warn("[JwtFilter] Token JWT não encontrado no header ou cookie");
     }
 }
